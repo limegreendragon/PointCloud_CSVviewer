@@ -11,6 +11,9 @@ The input CSV is **not** a typical point-per-row CSV. Instead, it represents a s
 
 This tool reconstructs the full coordinate mesh and outputs a clean point cloud.
 
+## To run:
+python convert_and_plot.py path/to/file.csv
+
 ---
 
 ## Example input format (grid CSV)
