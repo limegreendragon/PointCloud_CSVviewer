@@ -39,6 +39,7 @@ python convert_and_plot.py path/to/file.csv
 4. Removes invalid points (NaN / blank)  
 5. Plots an interactive 3D scatter with height-based coloring
 ---
+<img width="955" height="772" alt="Screenshot 2026-02-26 at 18 45 18" src="https://github.com/user-attachments/assets/d6e6a750-224a-452d-a63d-4628ab09d189" />
 
 ## Installation
 
