@@ -46,4 +46,6 @@ python convert_and_plot.py path/to/file.csv
 Python 3.9+ recommended.
 
 ```bash
+git clone https://github.com/limegreendragon/PointCloud_CSVviewer.git
+cd PointCloud_CSVviewer
 pip install -r requirements.txt
