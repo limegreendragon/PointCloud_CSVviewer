@@ -11,8 +11,18 @@ The input CSV is **not** a typical point-per-row CSV. Instead, it represents a s
 
 This tool reconstructs the full coordinate mesh and outputs a clean point cloud.
 
+## Installation
+
+Python 3.9+ recommended.
+
+```bash
+git clone https://github.com/limegreendragon/PointCloud_CSVviewer.git
+cd PointCloud_CSVviewer
+pip install -r Requirements.txt
+```
+
 ## To run:
-python convert_and_plot.py path/to/file.csv
+python Convert_and_plot.py path/to/file.csv
 
 ---
 
@@ -41,11 +51,3 @@ python convert_and_plot.py path/to/file.csv
 ---
 <img width="955" height="772" alt="Screenshot 2026-02-26 at 18 45 18" src="https://github.com/user-attachments/assets/d6e6a750-224a-452d-a63d-4628ab09d189" />
 
-## Installation
-
-Python 3.9+ recommended.
-
-```bash
-git clone https://github.com/limegreendragon/PointCloud_CSVviewer.git
-cd PointCloud_CSVviewer
-pip install -r requirements.txt
