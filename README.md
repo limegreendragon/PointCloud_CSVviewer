@@ -22,8 +22,9 @@ pip install -r Requirements.txt
 ```
 
 ## To run:
+```bash
 python Convert_and_plot.py path/to/file.csv
-
+```
 ---
 
 ## Example input format (grid CSV)
