@@ -201,9 +201,90 @@ A community-built action that creates the Release entry and attaches both zips �
 - **Apple Silicon vs Intel Macs:** GitHub's Mac runners are Apple Silicon (M-series), so the `.app` runs natively on newer Macs. On an older Intel Mac it typically still works via Rosetta (Mac's built-in translator); PyInstaller can be configured to build for both chip types if that ever becomes a problem.
 - **Unsigned app warning:** since this isn't signed with a paid Apple Developer certificate, macOS will warn the app is from an "unidentified developer" the first time it's opened — users need to right-click → Open instead of double-clicking.
 
+## Part 5: Code signing & notarization (optional — requires a paid Apple Developer account)
+ 
+**This repo does not currently do this** — it's documented here for when/if it's worth doing. `release.yml` itself (Part 6) is left as the plain, unsigned version.
+ 
+### What it fixes
+Without signing, every person who downloads the Mac app sees a Gatekeeper warning ("Apple could not verify this app is free of malware") and has to manually override it. Signing and notarizing removes that warning entirely — the app just opens.
+ 
+### What's required first
+1. Enroll in the **Apple Developer Program** — $99/year, at developer.apple.com
+2. Generate a **"Developer ID Application"** certificate through the Apple Developer account (the specific certificate type for distributing apps outside the Mac App Store)
+3. Export it as a `.p12` file with a password, then base64-encode it and store it as a GitHub secret (never commit the `.p12` itself — see the certificate-handling note below the code)
+### The code that links the certificate in
+ 
+These three steps would be inserted into the `build` job, right after **"Build with PyInstaller"** and before **"Package (macOS)"** — each one only runs on the macOS matrix entries:
+ 
+```yaml
+- name: Import signing certificate into a temporary keychain
+  if: runner.os == 'macOS'
+  env:
+    CERTIFICATE_P12: ${{ secrets.MAC_CERTIFICATE_P12 }}
+    CERTIFICATE_PASSWORD: ${{ secrets.MAC_CERTIFICATE_PASSWORD }}
+    KEYCHAIN_PASSWORD: ${{ secrets.MAC_KEYCHAIN_PASSWORD }}
+  run: |
+    echo "$CERTIFICATE_P12" | base64 --decode > certificate.p12
+    security create-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
+    security default-keychain -s build.keychain
+    security unlock-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
+    security import certificate.p12 -k build.keychain -P "$CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+    security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" build.keychain
+```
+Rebuilds the `.p12` from the base64 text stored in the `MAC_CERTIFICATE_P12` secret, then loads it into a throwaway keychain created just for this run (cloud machines don't have your Mac's real keychain).
+ 
+```yaml
+- name: Code sign the app
+  if: runner.os == 'macOS'
+  env:
+    SIGNING_IDENTITY: ${{ secrets.MAC_SIGNING_IDENTITY }}
+  run: |
+    codesign --deep --force --options runtime \
+      --sign "$SIGNING_IDENTITY" \
+      dist/PointCloudViewer.app
+```
+Stamps the built app with the certificate, cryptographically proving it came from a specific registered developer. `--options runtime` turns on Apple's "hardened runtime," which notarization requires.
+ 
+```yaml
+- name: Notarize the app with Apple
+  if: runner.os == 'macOS'
+  env:
+    APPLE_ID: ${{ secrets.APPLE_ID }}
+    APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+    APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+  run: |
+    ditto -c -k --keepParent dist/PointCloudViewer.app notarize.zip
+    xcrun notarytool submit notarize.zip \
+      --apple-id "$APPLE_ID" \
+      --password "$APPLE_APP_PASSWORD" \
+      --team-id "$APPLE_TEAM_ID" \
+      --wait
+    xcrun stapler staple dist/PointCloudViewer.app
+```
+Zips the signed app and submits it to Apple's servers for scanning; `--wait` pauses the workflow until Apple responds. `stapler staple` attaches Apple's approval ticket to the app so it can be verified even offline later.
+ 
+### Secrets you'd need to add
+(Repo → Settings → Secrets and variables → Actions → New repository secret. None of these exist until the certificate is actually obtained.)
+ 
+| Secret name | What it is |
+|---|---|
+| `MAC_CERTIFICATE_P12` | The Developer ID certificate, exported as `.p12`, then base64-encoded |
+| `MAC_CERTIFICATE_PASSWORD` | The password set when exporting that `.p12` |
+| `MAC_KEYCHAIN_PASSWORD` | Any made-up password — just secures the throwaway keychain for the run |
+| `MAC_SIGNING_IDENTITY` | The certificate's exact name, e.g. `Developer ID Application: Your Name (TEAMID1234)` |
+| `APPLE_ID` | The Apple ID email tied to the Developer account |
+| `APPLE_APP_PASSWORD` | An app-specific password generated at appleid.apple.com (not the real Apple ID password) |
+| `APPLE_TEAM_ID` | The 10-character Team ID, found in the Apple Developer account |
+ 
+### A note on the `.p12` file itself
+The certificate never goes in the repo. It's exported once from Keychain Access onto your own Mac, converted to base64 text (`base64 -i Certificate.p12 -o certificate_base64.txt`), and that text is pasted into the `MAC_CERTIFICATE_P12` secret above — a separate encrypted vault, not the file tree. The `Import signing certificate` step only rebuilds it temporarily, inside the disposable cloud runner, and it's destroyed automatically when that job finishes.
+ 
+### Limits of this
+- **Windows is unaffected either way.** Windows has its own, unrelated warning (SmartScreen) for unsigned `.exe` files, which needs its own separate paid certificate from a different provider — nothing to do with Apple or this section.
+- It's an ongoing cost ($99/year) — worth it for regularly distributing to non-technical users; likely unnecessary for sharing with a handful of people who don't mind the one-time System Settings override.
 ---
-
-## Full workflow file
+ 
+## Part 6: Full workflow file
 
 Save this as `.github/workflows/release.yml`:
 
