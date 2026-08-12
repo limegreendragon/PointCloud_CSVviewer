@@ -115,6 +115,17 @@ Downloads a fresh copy of the repo onto the temporary machine — the same idea 
     python-version: '3.11'
 ```
 These machines start blank, so this installs Python 3.11.
+If you used a different language - you will need to update this so that it mirrors the native language and some languages are specific to only Windows or only mac 
+
+| Stack | "Set up" step | Build/package tool | Typical output |
+|---|---|---|---|
+| Python (what you have) | `actions/setup-python` | PyInstaller | onefile `.exe` / `.app` |
+| JavaScript (Electron) | `actions/setup-node` | `electron-builder` | installer `.exe` (NSIS) / `.dmg` |
+| C# / .NET | `actions/setup-dotnet` | `dotnet publish -r win-x64 --self-contained` | `.exe`, or native `.app` via .NET MAUI |
+| Java | `actions/setup-java` | `jpackage` (built into modern JDKs) | native installer per OS |
+| Go | `actions/setup-go` | `go build` | single binary |
+| Rust | manual toolchain install | `cargo build --release` (+ `cargo-bundle` for a proper `.app`) | single binary |
+| Native Swift/C++ | none — preinstalled on the runners | `xcodebuild` / `msbuild` | `.app` / `.exe` |
 
 ```yaml
 - name: Install dependencies
