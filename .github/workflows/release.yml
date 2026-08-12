@@ -15,8 +15,10 @@ jobs:
         include:
           - os: windows-latest
             artifact: PointCloudViewer-Windows.zip
-          - os: macos-latest
-            artifact: PointCloudViewer-Mac.zip
+          - os: macos-26
+            artifact: PointCloudViewer-Mac-AppleSilicon.zip
+          - os: macos-26-intel
+            artifact: PointCloudViewer-Mac-Intel.zip
     runs-on: ${{ matrix.os }}
     steps:
       - name: Check out code
