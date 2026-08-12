@@ -225,7 +225,7 @@ jobs:
         include:
           - os: windows-latest
             artifact: PointCloudViewer-Windows.zip
-          - os: macos-latest
+          - os: macos-latest # silicon chip fyi
             artifact: PointCloudViewer-Mac.zip
     runs-on: ${{ matrix.os }}
     steps:
