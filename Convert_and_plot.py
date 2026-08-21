@@ -21,6 +21,7 @@ import functools
 import http.server
 import io
 import os
+import sys
 import threading
 
 import webview
@@ -31,6 +32,7 @@ from pointcloud.resources import resource_path
 
 WINDOW_TITLE = "PointCloud Viewer"
 EXPORT_VIEW_ORDER = ["top", "side", "front"]
+DEBUG_LOG_PATH = os.path.expanduser("~/PointCloudViewer_debug_log.txt")
 
 
 class _QuietRequestHandler(http.server.SimpleHTTPRequestHandler):
@@ -132,8 +134,60 @@ class Api:
         return {"cancelled": False, "path": folder}
 
 
+def _write_startup_debug_log(webapp_dir):
+    """Writes what we know about where the app looked for its viewer
+    files, so a report from a broken build actually says something
+    useful instead of just "it showed a 404". Best-effort: if even this
+    fails, we still want to fall through to the on-screen error page."""
+    lines = [
+        "PointCloud Viewer startup diagnostic",
+        f"frozen (running from a packaged build): {getattr(sys, 'frozen', False)}",
+        f"sys._MEIPASS: {getattr(sys, '_MEIPASS', '(not set -- running from source)')}",
+        f"expected webapp folder: {webapp_dir}",
+        f"webapp folder exists: {os.path.isdir(webapp_dir)}",
+    ]
+    meipass = getattr(sys, "_MEIPASS", None)
+    if meipass and os.path.isdir(meipass):
+        lines.append(f"contents of {meipass}:")
+        lines.extend(f"  - {name}" for name in sorted(os.listdir(meipass)))
+    try:
+        with open(DEBUG_LOG_PATH, "w") as f:
+            f.write("\n".join(lines) + "\n")
+    except OSError:
+        pass  # nothing more we can do if we can't even write the log
+
+
+def _show_missing_webapp_error():
+    """Shown instead of a blank/broken window when the viewer's own
+    HTML/JS files (webapp/index.html etc.) can't be found -- this is a
+    packaging bug, not something a user did wrong, so this points at the
+    debug log rather than pretending there's a fix to try."""
+    webview.create_window(
+        WINDOW_TITLE,
+        html=f"""
+        <body style="font-family: -apple-system, sans-serif; padding: 32px; max-width: 560px;">
+          <h2>PointCloud Viewer couldn't start</h2>
+          <p>The app's viewer files (the <code>webapp</code> folder) weren't
+          found where this build expected them -- that's a packaging bug,
+          not something wrong with your CSV or computer.</p>
+          <p>A debug log was written to:<br><code>{DEBUG_LOG_PATH}</code></p>
+          <p>Please share that file so this can be fixed.</p>
+        </body>
+        """,
+        width=640,
+        height=420,
+    )
+    webview.start()
+
+
 def main():
-    port = _start_local_server(resource_path("webapp"))
+    webapp_dir = resource_path("webapp")
+    if not os.path.isfile(os.path.join(webapp_dir, "index.html")):
+        _write_startup_debug_log(webapp_dir)
+        _show_missing_webapp_error()
+        return
+
+    port = _start_local_server(webapp_dir)
     api = Api()
     webview.create_window(
         WINDOW_TITLE,
