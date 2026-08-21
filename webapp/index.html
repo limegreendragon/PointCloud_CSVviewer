@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>PointCloud Viewer</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app">
+  <aside id="sidebar">
+    <div id="sidebarHeader">
+      <h1>PointCloud Viewer<span>Grid CSV &rarr; 3D point cloud</span></h1>
+      <button id="themeToggleBtn" class="theme-switch" title="Switch between light and dark mode" aria-label="Toggle light/dark mode">
+        <span class="theme-switch-track"><span class="theme-switch-thumb"></span></span>
+      </button>
+    </div>
+
+    <div id="dropzone">Drop a grid CSV file here</div>
+
+    <div class="stack">
+      <button id="browseFileBtn">Browse File&hellip;</button>
+      <button id="browseFolderBtn">Browse Folder&hellip;</button>
+    </div>
+
+    <div id="fileListWrap" hidden>
+      <div class="section-label">Files in folder</div>
+      <ul id="fileList"></ul>
+    </div>
+
+    <div id="controls" hidden class="stack">
+      <div>
+        <div class="section-label">Colour mode</div>
+        <div class="segmented">
+          <button id="heatmapModeBtn" data-mode="heatmap" class="active">Heatmap</button>
+          <button id="greyscaleModeBtn" data-mode="greyscale">Greyscale</button>
+        </div>
+      </div>
+
+      <label class="checkbox-row">
+        <input type="checkbox" id="contoursToggle" checked>
+        Contour lines
+      </label>
+
+      <div id="contourDensityRow" class="slider-row">
+        <div class="slider-row-label">
+          <span>Density</span>
+          <span id="contourDensityValue">25 lines</span>
+        </div>
+        <input type="range" id="contourDensitySlider" min="3" max="80" value="25">
+      </div>
+
+      <label class="checkbox-row">
+        <input type="checkbox" id="baseToggle" checked>
+        Base grid
+      </label>
+
+      <button id="resetViewBtn">Reset View</button>
+      <div class="section-label" style="margin-top:-2px; text-transform:none; letter-spacing:normal;">
+        Drag to orbit &middot; scroll to zoom &middot; Ctrl+drag to roll
+      </div>
+
+      <div>
+        <div class="section-label">Export current view</div>
+        <div class="row">
+          <button id="exportPngBtn">PNG</button>
+          <button id="exportPdfBtn">PDF</button>
+        </div>
+        <div class="section-label" style="margin-top:6px; text-transform:none; letter-spacing:normal;">
+          Saves top-down, left-right and front-back orientations.
+        </div>
+      </div>
+    </div>
+
+    <div id="status">Drop a CSV file, or browse for one.</div>
+  </aside>
+
+  <main id="viewport">
+    <canvas id="scene"></canvas>
+    <canvas id="minimap" width="150" height="150"></canvas>
+    <div id="hScrollTrack" class="scroll-track"><div id="hScrollThumb" class="scroll-thumb"></div></div>
+    <div id="vScrollTrack" class="scroll-track"><div id="vScrollThumb" class="scroll-thumb"></div></div>
+  </main>
+</div>
+
+<script type="module" src="app.js"></script>
+</body>
+</html>
