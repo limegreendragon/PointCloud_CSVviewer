@@ -19,10 +19,7 @@ a = Analysis(
     ['Convert_and_plot.py'],
     pathex=[],
     binaries=[],
-    # (source, destination-inside-the-bundle) -- ships the whole webapp/
-    # folder so pointcloud/resources.py can find it at runtime via
-    # resource_path("webapp").
-    datas=[('webapp', 'webapp')],
+    datas=[],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},
@@ -33,6 +30,14 @@ a = Analysis(
 
 pyz = PYZ(a.pure)
 
+# Ships the whole webapp/ folder so pointcloud/resources.py can find it at
+# runtime via resource_path("webapp"). Tree() (rather than a plain
+# datas=[('webapp', 'webapp')] tuple in Analysis above) is PyInstaller's
+# documented way to bundle an entire directory -- a real build showed the
+# plain-tuple form silently dropping the folder, so this is the version
+# that's actually been confirmed to work.
+webapp_files = Tree('webapp', prefix='webapp')
+
 # onefile build: everything (interpreter, libraries, webapp/ assets) packed
 # into one executable, same as the old --onefile flag.
 exe = EXE(
@@ -40,6 +45,7 @@ exe = EXE(
     a.scripts,
     a.binaries,
     a.datas,
+    webapp_files,
     [],
     name='PointCloudViewer',
     debug=False,
