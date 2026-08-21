@@ -1,4 +1,4 @@
 pandas
 numpy
-plotly
-tkinterdnd2
+pillow
+pywebview
