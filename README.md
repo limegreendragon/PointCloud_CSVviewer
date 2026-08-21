@@ -93,18 +93,18 @@ the command line anymore, everything's done from inside the app:
 ---
 
 ## What it looks like:
-Dark mode:
+### Dark mode:
 <img width="1184" height="778" alt="Screenshot 2026-08-21 at 11 44 24" src="https://github.com/user-attachments/assets/4b92a445-22a3-4183-9710-e1453a03ab5e" />
-Light Mode:
+###Light Mode:
 <img width="1176" height="749" alt="Screenshot 2026-08-21 at 11 44 56" src="https://github.com/user-attachments/assets/da1129e2-01ff-44af-8353-c5ca4e245e07" />
-Exported PMGs:
+###Exported PNGs:
 <img width="899" height="1200" alt="2026-06-04_08-59-19-566_top" src="https://github.com/user-attachments/assets/122931d2-4a29-40d3-b5ad-7d74ac9615b5" />
 <img width="1200" height="247" alt="2026-06-04_08-59-19-566_side" src="https://github.com/user-attachments/assets/f4b9e6f6-2167-41b6-b345-b571762664a3" />
 <img width="1200" height="329" alt="2026-06-04_08-59-19-566_front" src="https://github.com/user-attachments/assets/b627a0ed-1e66-42b4-9b2f-d0d1179efce5" />
 
 
 
-## Under the hood, briefly
+## Under the hood, (briefly)
 
 `Convert_and_plot.py` opens one native window using
 [pywebview](https://pywebview.flowrl.com/), which hosts the actual viewer —
