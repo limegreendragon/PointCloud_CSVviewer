@@ -35,7 +35,11 @@ jobs:
           pip install pyinstaller
 
       - name: Build with PyInstaller
-        run: pyinstaller --onefile --windowed --name PointCloudViewer --collect-all tkinterdnd2 Convert_and_plot.py
+        # Uses PointCloudViewer.spec instead of a raw --onefile/--add-data
+        # command line -- see the comment at the top of that file for why
+        # (short version: --add-data needs a different separator on Windows
+        # than on macOS, and the .spec file sidesteps that entirely).
+        run: pyinstaller PointCloudViewer.spec
 
       - name: Package (Windows)
         if: runner.os == 'Windows'
