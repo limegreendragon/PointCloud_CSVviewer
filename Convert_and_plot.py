@@ -1,146 +1,149 @@
+"""PointCloud Viewer -- entry point.
+
+Opens a single native window (via pywebview) that hosts the interactive
+viewer built in webapp/ (HTML/CSS/JS + Three.js). This window lets you:
+  - drag-and-drop a grid CSV, or Browse for one/a whole folder of them
+  - view it as a heatmap or greyscale point cloud, with contour lines
+  - freely pan/zoom/rotate, with a minimap + scrollbars to stay oriented
+  - export the current point cloud as PNG or PDF in three fixed views
+
+Why a local HTTP server instead of pointing the window straight at
+webapp/index.html on disk: the viewer uses ES module imports
+(`import ... from './vendor/three.module.js'`), and several webview
+backends refuse to load module scripts from file:// URLs (they treat it as
+a disallowed cross-origin request). Serving the same folder over
+http://127.0.0.1 sidesteps that entirely, and costs nothing since it's a
+few static files served from a background thread on this machine only.
+"""
+
+import base64
+import functools
+import http.server
+import io
 import os
-import traceback
-import tkinter as tk
-from tkinter import filedialog, messagebox
+import threading
 
-import pandas as pd
-import numpy as np
-import plotly.graph_objects as go
+import webview
+from PIL import Image
 
-try:
-    from tkinterdnd2 import DND_FILES, TkinterDnD
-    DND_AVAILABLE = True
-except ImportError:
-    DND_AVAILABLE = False
+from pointcloud.loaders import list_csv_files, load_csv_grid, load_csv_text
+from pointcloud.resources import resource_path
+
+WINDOW_TITLE = "PointCloud Viewer"
+EXPORT_VIEW_ORDER = ["top", "side", "front"]
 
 
-def convert_and_plot(file_path):
-    """Load a grid-formatted CSV, convert it to an XYZ point cloud, and plot it.
-    This is your original script's logic, unchanged, just wrapped in a function."""
-    file_path = os.path.expanduser(file_path)
-    print(f"Loading file: {file_path}")
+class _QuietRequestHandler(http.server.SimpleHTTPRequestHandler):
+    """Same as the default handler, just without a log line for every
+    request -- there's nothing useful to see there for this app."""
 
-    df = pd.read_csv(file_path)
+    def log_message(self, format, *args):  # noqa: A002 (matches base signature)
+        pass
 
-    # 1. Extract Y values (first column)
-    y_vals = df.iloc[:, 0].astype(float).values
-    # 2. Extract X values (column headers except first)
-    x_vals = df.columns[1:].astype(float)
-    # 3. Extract Z matrix
-    z_vals = df.iloc[:, 1:].astype(float).values
-    # 4. Create meshgrid
-    X, Y = np.meshgrid(x_vals, y_vals)
-    # 5. Flatten everything
-    X_flat = X.flatten()
-    Y_flat = Y.flatten()
-    Z_flat = z_vals.flatten()
-    # 6. Remove NaNs
-    mask = ~np.isnan(Z_flat)
-    X_clean = X_flat[mask]
-    Y_clean = Y_flat[mask]
-    Z_clean = Z_flat[mask]
-    # 7. Build point cloud dataframe
-    point_cloud = pd.DataFrame({"X": X_clean, "Y": Y_clean, "Z": Z_clean})
-    print(point_cloud.head())
 
-    fig = go.Figure(
-        data=[
-            go.Scatter3d(
-                x=point_cloud["X"],
-                y=point_cloud["Y"],
-                z=point_cloud["Z"],
-                mode="markers",
-                marker=dict(
-                    size=2,
-                    color=point_cloud["Z"],
-                    colorscale="RdYlGn_r",
-                    colorbar=dict(title="Height (Z)"),
-                    opacity=0.8,
-                ),
+def _start_local_server(directory):
+    """Serve `directory` on 127.0.0.1 at an OS-assigned free port, in a
+    background thread. Returns the port number."""
+    handler = functools.partial(_QuietRequestHandler, directory=directory)
+    httpd = http.server.ThreadingHTTPServer(("127.0.0.1", 0), handler)
+    thread = threading.Thread(target=httpd.serve_forever, daemon=True)
+    thread.start()
+    return httpd.server_address[1]
+
+
+def _first_path(dialog_result):
+    """pywebview's create_file_dialog returns a tuple of chosen paths (or
+    None if the user cancelled). We only ever ask for one."""
+    if not dialog_result:
+        return None
+    if isinstance(dialog_result, (list, tuple)):
+        return dialog_result[0] if dialog_result else None
+    return dialog_result
+
+
+def _decode_data_url(data_url):
+    """'data:image/png;base64,AAAA...' -> a Pillow Image."""
+    _header, b64_data = data_url.split(",", 1)
+    raw_bytes = base64.b64decode(b64_data)
+    return Image.open(io.BytesIO(raw_bytes)).convert("RGB")
+
+
+class Api:
+    """Methods exposed to the viewer's JavaScript as
+    `window.pywebview.api.<name>(...)`."""
+
+    def pick_file(self):
+        window = webview.windows[0]
+        result = window.create_file_dialog(
+            webview.OPEN_DIALOG,
+            file_types=("CSV Files (*.csv)", "All files (*.*)"),
+        )
+        return _first_path(result)
+
+    def pick_folder(self):
+        """Opens a folder picker and returns the manifest of .csv files
+        found inside it (name + path), ready for the sidebar file list."""
+        window = webview.windows[0]
+        result = window.create_file_dialog(webview.FOLDER_DIALOG)
+        folder = _first_path(result)
+        if not folder:
+            return None
+        return list_csv_files(folder)
+
+    def load_path(self, path):
+        return load_csv_grid(path)
+
+    def load_csv_text(self, csv_text, source_name="dropped file"):
+        return load_csv_text(csv_text, source_name=source_name)
+
+    def export_views(self, payload):
+        """payload: {"format": "png"|"pdf", "images": {"top"/"side"/"front":
+        <data URL>}, "base_name": str}. Opens a native save dialog and
+        writes the file(s) with Pillow."""
+        export_format = payload.get("format", "png")
+        base_name = payload.get("base_name") or "pointcloud"
+        images = {
+            view: _decode_data_url(data_url)
+            for view, data_url in payload.get("images", {}).items()
+        }
+        window = webview.windows[0]
+
+        if export_format == "pdf":
+            chosen = window.create_file_dialog(
+                webview.SAVE_DIALOG, save_filename=f"{base_name}.pdf"
             )
-        ]
-    )
-    fig.update_layout(
-        title="3D Crab Scanner Point Cloud (Height Coloured)",
-        scene=dict(xaxis_title="X", yaxis_title="Y", zaxis_title="Z"),
-        height=800,
-    )
-    fig.show()
+            path = _first_path(chosen)
+            if not path:
+                return {"cancelled": True}
+            if not path.lower().endswith(".pdf"):
+                path += ".pdf"
+            ordered = [images[v] for v in EXPORT_VIEW_ORDER if v in images]
+            if not ordered:
+                return {"cancelled": True}
+            ordered[0].save(path, save_all=True, append_images=ordered[1:])
+            return {"cancelled": False, "path": path}
 
-
-class App:
-    def __init__(self, root):
-        self.root = root
-        root.title("Crab Scanner Point Cloud Viewer")
-        root.geometry("480x280")
-        root.resizable(False, False)
-
-        self.status_var = tk.StringVar(value="Drop a CSV file below, or browse for one")
-
-        title = tk.Label(root, text="Grid CSV \u2192 3D Point Cloud", font=("Segoe UI", 14, "bold"))
-        title.pack(pady=(20, 5))
-
-        self.drop_frame = tk.Frame(
-            root, width=400, height=140, bg="#f0f0f0",
-            highlightbackground="#999999", highlightthickness=2
-        )
-        self.drop_frame.pack(pady=10)
-        self.drop_frame.pack_propagate(False)
-
-        self.drop_label = tk.Label(
-            self.drop_frame, textvariable=self.status_var, bg="#f0f0f0",
-            wraplength=360, justify="center"
-        )
-        self.drop_label.pack(expand=True)
-
-        browse_btn = tk.Button(root, text="Browse for CSV...", command=self.browse_file, width=20)
-        browse_btn.pack(pady=(5, 20))
-
-        if DND_AVAILABLE:
-            self.drop_frame.drop_target_register(DND_FILES)
-            self.drop_frame.dnd_bind("<<Drop>>", self.on_drop)
-        else:
-            self.status_var.set(
-                "Drag-and-drop unavailable (tkinterdnd2 not installed).\nUse Browse instead."
-            )
-
-    def on_drop(self, event):
-        # event.data can wrap the path in {} if it contains spaces
-        path = event.data.strip()
-        if path.startswith("{") and path.endswith("}"):
-            path = path[1:-1]
-        self.handle_file(path)
-
-    def browse_file(self):
-        path = filedialog.askopenfilename(
-            title="Select a grid CSV file",
-            filetypes=[("CSV files", "*.csv"), ("All files", "*.*")],
-        )
-        if path:
-            self.handle_file(path)
-
-    def handle_file(self, path):
-        if not path.lower().endswith(".csv"):
-            messagebox.showerror("Invalid file", "Please choose a .csv file.")
-            return
-        self.status_var.set(f"Loading:\n{os.path.basename(path)}")
-        self.root.update_idletasks()
-        try:
-            convert_and_plot(path)
-            self.status_var.set("Done \u2014 plot opened in your browser.\nDrop another file, or browse.")
-        except Exception as e:
-            traceback.print_exc()
-            messagebox.showerror("Error processing file", str(e))
-            self.status_var.set("Drop a CSV file below, or browse for one")
+        chosen = window.create_file_dialog(webview.FOLDER_DIALOG)
+        folder = _first_path(chosen)
+        if not folder:
+            return {"cancelled": True}
+        for view, image in images.items():
+            image.save(os.path.join(folder, f"{base_name}_{view}.png"))
+        return {"cancelled": False, "path": folder}
 
 
 def main():
-    if DND_AVAILABLE:
-        root = TkinterDnD.Tk()
-    else:
-        root = tk.Tk()
-    App(root)
-    root.mainloop()
+    port = _start_local_server(resource_path("webapp"))
+    api = Api()
+    webview.create_window(
+        WINDOW_TITLE,
+        url=f"http://127.0.0.1:{port}/index.html",
+        js_api=api,
+        width=1180,
+        height=780,
+        min_size=(860, 560),
+    )
+    webview.start()
 
 
 if __name__ == "__main__":
