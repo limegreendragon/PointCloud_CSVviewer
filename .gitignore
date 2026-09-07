@@ -1,1 +1,11 @@
 Understanding Release.md
+
+# PyInstaller build output (produced locally by `pyinstaller PointCloudViewer.spec`)
+build/
+dist/
+
+# Python
+__pycache__/
+*.pyc
+
+.DS_Store

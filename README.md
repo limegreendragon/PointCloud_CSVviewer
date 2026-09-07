@@ -3,8 +3,9 @@
 This repository turns **grid-formatted CSV surface files** (exported by the
 crab scanner / Gocator capture tool) into a standard **X,Y,Z point cloud**
 and opens it in **PointCloud Viewer** — a single interactive window where
-you can look around the scan, switch how it's coloured, and export it as an
-image.
+you can browse straight to the scanner's own compressed archives, look
+around the scan, switch how it's coloured, read its GPS/timestamp metadata,
+and export it as an image.
 
 The input CSV is **not** a typical point-per-row CSV. Instead, it represents
 a surface grid:
@@ -33,13 +34,16 @@ pip install -r Requirements.txt
 python Convert_and_plot.py
 ```
 
-This opens the **PointCloud Viewer** window — there's no file to pass on
-the command line anymore, everything's done from inside the app:
+A small loading screen appears immediately, then the **PointCloud Viewer**
+window opens — there's no file to pass on the command line, everything's
+done from inside the app:
 
 1. **Load a file** — drag a `.csv` onto the drop zone, click **Browse
-   File…** for one file, or **Browse Folder…** to pick from every CSV in a
-   folder (each file is its own separate point cloud; pick one from the
-   list to view it).
+   File…** for one file (`.csv` or `.zip`), or **Browse Folder…** to list
+   every CSV *and* archive in a folder (badged `CSV`/`ZIP`, scrollable if
+   there are a lot of them). Each `.zip` is one of the scanner's own
+   compressed exports — click it and it's extracted to a temporary location
+   automatically (see **Archives** below); pick any entry to view it.
 2. **Look around** — left-drag orbits around the scan (it always stays
    level, no flipping), scroll to zoom, right-drag/shift-drag to pan. Hold
    **Ctrl** and drag to roll/tilt the camera instead — a separate control
@@ -56,13 +60,36 @@ the command line anymore, everything's done from inside the app:
    curve, which only spans a narrow slice of the scan's overall height
    range). **Base grid** adds a flat reference grid at the bottom of the
    scan so you can tell which way is "down" while rotating freely around
+   it. These controls (and Export, below) are there from the moment the app
+   opens — set them how you like before loading anything and they'll apply
+   to whatever you load first.
+4. **Light/dark mode** — the sun/moon icons and switch next to the title
+   swap the whole app's theme; your choice is remembered next time you open
    it.
-4. **Light/dark mode** — the switch next to the title in the sidebar swaps
-   the whole app's theme; your choice is remembered next time you open it.
-5. **Export** — **PNG** or **PDF** saves the current point cloud from three
+5. **Metadata** — when a loaded archive has a JSON file alongside its CSV
+   (GPS, capture time, device info, etc.), it's laid out as a label/value
+   grid in the collapsible bar along the bottom of the window. Nothing to
+   do here — it fills in automatically, and stays hidden for a plain CSV
+   with no matching JSON.
+6. **Export** — **PNG** or **PDF** saves the current point cloud from three
    fixed orthographic angles: top-down (plan), left-right (side), and
    front-back. PNG saves three separate images; PDF saves one three-page
    file. You'll be asked where to save it.
+
+## Archives
+
+The scanner's real output is a `.zip` per scan (PPMd-compressed — an
+unusual compression method most zip tools don't support, handled here
+without any extra software needed), each containing one CSV and one JSON
+file. Clicking one in **Browse Folder…** extracts it into a temporary
+folder on your machine, loads the CSV as normal, and reads the JSON into
+the metadata bar. Nothing is written back into the archive or its folder.
+
+Extracted temp folders are cleaned up **when you close the app**, not as
+you switch between files — so flipping back and forth between scans in one
+session doesn't re-extract them. Anything you've exported as PNG/PDF is
+saved wherever you chose in the Save dialog, never inside a temp folder, so
+it's completely unaffected by that cleanup.
 
 ## Example input format (grid CSV)
 ```
@@ -82,12 +109,15 @@ the command line anymore, everything's done from inside the app:
 
 ## What it does
 
-1. Reads a grid CSV (or a folder of them)
+1. Reads a grid CSV — on its own, in a folder of them, or straight out of
+   the scanner's compressed `.zip` archives
 2. Builds an X/Y mesh from the headers
 3. Sends the grid to the viewer, which renders it as a 3D point cloud
    coloured by height, with adjustable-density contour lines traced across
    the surface and a base grid for orientation
-4. Lets you freely rotate/pan/zoom/roll around it in light or dark mode,
+4. Reads an archive's accompanying JSON (GPS, timestamp, etc.) into a
+   metadata panel alongside the point cloud
+5. Lets you freely rotate/pan/zoom/roll around it in light or dark mode,
    and export the result as a PNG or PDF in three fixed views
 
 ---
@@ -97,6 +127,12 @@ the command line anymore, everything's done from inside the app:
 <img width="1184" height="778" alt="Screenshot 2026-08-21 at 11 44 24" src="https://github.com/user-attachments/assets/4b92a445-22a3-4183-9710-e1453a03ab5e" />
 ### Light Mode:
 <img width="1176" height="749" alt="Screenshot 2026-08-21 at 11 44 56" src="https://github.com/user-attachments/assets/da1129e2-01ff-44af-8353-c5ca4e245e07" />
+### Loading screen:
+*(screenshot here — the splash shown while the app starts up)*
+### Browsing a folder of archives:
+*(screenshot here — the CSV/ZIP-badged, scrollable file list)*
+### Metadata bar:
+*(screenshot here — the bottom bar after loading an archive with GPS/timestamp data)*
 ### Exported PNGs:
 <img width="899" height="1200" alt="2026-06-04_08-59-19-566_top" src="https://github.com/user-attachments/assets/122931d2-4a29-40d3-b5ad-7d74ac9615b5" />
 <img width="1200" height="247" alt="2026-06-04_08-59-19-566_side" src="https://github.com/user-attachments/assets/f4b9e6f6-2167-41b6-b345-b571762664a3" />
@@ -113,7 +149,14 @@ for the 3D rendering, split into a few focused files: `viewer.js` (the 3D
 scene itself), `contours.js` (traces the height-band lines), `minimap.js`
 and `scrollbars.js` (the navigation aids), `colormap.js` (heatmap/greyscale
 colouring) and `theme.js` (light/dark colours for everything that isn't
-plain HTML/CSS). `pointcloud/loaders.py` has the grid-parsing logic (the
-same math the original single-file script used); `Convert_and_plot.py`
-just exposes it to the window's JavaScript so the UI can call it. Nothing
-gets uploaded anywhere — the CSV never leaves your machine.
+plain HTML/CSS). On the Python side, `pointcloud/loaders.py` has the
+grid-parsing and JSON-metadata logic (the same grid math the original
+single-file script used), and `pointcloud/archives.py` handles extracting
+the scanner's PPMd-compressed `.zip` archives — Python's own `zipfile`
+module can't read that compression method, so this registers a small
+decoder for it built on the `pyppmd` library. `Convert_and_plot.py` wires
+both up and exposes them to the window's JavaScript so the UI can call
+them, and shows the splash window before any of the slower imports
+(pandas/numpy/PIL) happen, so something appears on screen immediately
+rather than after a silent delay. Nothing gets uploaded anywhere — your
+files never leave your machine.
