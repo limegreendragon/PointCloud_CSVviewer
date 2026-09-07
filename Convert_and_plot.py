@@ -335,7 +335,7 @@ def main():
                 return
 
             port = _start_local_server(webapp_dir)
-            webview.create_window(
+            main_window = webview.create_window(
                 WINDOW_TITLE,
                 url=f"http://127.0.0.1:{port}/index.html",
                 js_api=api,
@@ -343,7 +343,12 @@ def main():
                 height=780,
                 min_size=(860, 560),
             )
-            splash.destroy()
+            # Wait for the real window to actually finish loading before
+            # closing the splash -- create_window() only queues the window,
+            # it doesn't mean anything has been painted yet, so destroying
+            # the splash immediately left a visible gap with no window
+            # showing anything (looked like the app quit and relaunched).
+            main_window.events.loaded += splash.destroy
         except Exception:
             _write_debug_log(
                 ["PointCloud Viewer startup crash", "", traceback.format_exc()]
