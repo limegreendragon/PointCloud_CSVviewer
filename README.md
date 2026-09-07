@@ -124,7 +124,9 @@ it's completely unaffected by that cleanup.
 
 ## What it looks like:
 ### Dark mode:
-<img width="1184" height="778" alt="Screenshot 2026-08-21 at 11 44 24" src="https://github.com/user-attachments/assets/4b92a445-22a3-4183-9710-e1453a03ab5e" />
+
+<img width="1178" height="1071" alt="Screenshot 2026-09-07 at 09 55 58" src="https://github.com/user-attachments/assets/572b862e-30ae-4e03-b405-63f72ec49cb4" />
+
 ### Light Mode:
 <img width="1176" height="749" alt="Screenshot 2026-08-21 at 11 44 56" src="https://github.com/user-attachments/assets/da1129e2-01ff-44af-8353-c5ca4e245e07" />
 ### Loading screen:
