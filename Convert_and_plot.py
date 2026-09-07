@@ -73,7 +73,7 @@ _SPLASH_HTML = """
     border: 3px solid #262c3d;
     border-top-color: #4f8dff;
     border-radius: 50%;
-    animation: spin 0.8s linear infinite;
+    animation: spin 3s linear infinite;
   }
   @keyframes spin { to { transform: rotate(360deg); } }
 </style>
