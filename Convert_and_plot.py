@@ -314,7 +314,7 @@ def main():
         resizable=False,
         background_color="#0f121a",  # matches the splash's own dark background, no white flash before it paints
     )
-      splash_shown_at = time.monotonic()
+    splash_shown_at = time.monotonic()
 
     def _close_splash():
         # Enforces MIN_SPLASH_SECONDS -- see its comment above. Runs on
