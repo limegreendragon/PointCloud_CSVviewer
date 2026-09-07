@@ -128,14 +128,13 @@ it's completely unaffected by that cleanup.
 <img width="1178" height="1071" alt="Screenshot 2026-09-07 at 09 55 58" src="https://github.com/user-attachments/assets/572b862e-30ae-4e03-b405-63f72ec49cb4" />
 
 ### Light Mode:
-<img width="1183" height="1072" alt="Screenshot 2026-09-07 at 09 56 23" src="https://github.com/user-attachments/assets/54b4c1b3-a8f0-4248-b17f-9edc22e7c1ff" />
-
+<img width="1176" height="749" alt="Screenshot 2026-08-21 at 11 44 56" src="https://github.com/user-attachments/assets/da1129e2-01ff-44af-8353-c5ca4e245e07" />
+### Loading screen:
+*(screenshot here — the splash shown while the app starts up)*
 ### Browsing a folder of archives:
-<img width="266" height="452" alt="Screenshot 2026-09-07 at 09 56 54" src="https://github.com/user-attachments/assets/45da69de-e89d-457b-b6fe-afd50f84ad2e" />
-
+*(screenshot here — the CSV/ZIP-badged, scrollable file list)*
 ### Metadata bar:
-<img width="1182" height="184" alt="Screenshot 2026-09-07 at 09 57 08" src="https://github.com/user-attachments/assets/ed363f38-f1ab-4ff1-b790-6fab0b3dfeae" />
-
+*(screenshot here — the bottom bar after loading an archive with GPS/timestamp data)*
 ### Exported PNGs:
 <img width="899" height="1200" alt="2026-06-04_08-59-19-566_top" src="https://github.com/user-attachments/assets/122931d2-4a29-40d3-b5ad-7d74ac9615b5" />
 <img width="1200" height="247" alt="2026-06-04_08-59-19-566_side" src="https://github.com/user-attachments/assets/f4b9e6f6-2167-41b6-b345-b571762664a3" />

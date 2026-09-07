@@ -7,12 +7,24 @@
 </head>
 <body>
 <div id="app">
+<div id="mainRow">
   <aside id="sidebar">
     <div id="sidebarHeader">
       <h1>PointCloud Viewer<span>Grid CSV &rarr; 3D point cloud</span></h1>
-      <button id="themeToggleBtn" class="theme-switch" title="Switch between light and dark mode" aria-label="Toggle light/dark mode">
-        <span class="theme-switch-track"><span class="theme-switch-thumb"></span></span>
-      </button>
+      <div class="theme-control">
+        <div class="theme-icons" aria-hidden="true">
+          <svg class="icon-sun" viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <circle cx="12" cy="12" r="4"/>
+            <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/>
+          </svg>
+          <svg class="icon-moon" viewBox="0 0 24 24" width="11" height="11" fill="currentColor">
+            <path d="M20 14.5A8.5 8.5 0 1 1 9.5 4a7 7 0 0 0 10.5 10.5z"/>
+          </svg>
+        </div>
+        <button id="themeToggleBtn" class="theme-switch" title="Switch between light and dark mode" aria-label="Toggle light/dark mode">
+          <span class="theme-switch-track"><span class="theme-switch-thumb"></span></span>
+        </button>
+      </div>
     </div>
 
     <div id="dropzone">Drop a grid CSV file here</div>
@@ -27,7 +39,7 @@
       <ul id="fileList"></ul>
     </div>
 
-    <div id="controls" hidden class="stack">
+    <div id="controls" class="stack">
       <div>
         <div class="section-label">Colour mode</div>
         <div class="segmented">
@@ -80,6 +92,15 @@
     <div id="hScrollTrack" class="scroll-track"><div id="hScrollThumb" class="scroll-thumb"></div></div>
     <div id="vScrollTrack" class="scroll-track"><div id="vScrollThumb" class="scroll-thumb"></div></div>
   </main>
+</div>
+
+<div id="metadataBar" hidden>
+  <button id="metadataToggleBtn" class="metadata-toggle" aria-label="Toggle metadata panel">
+    <span class="metadata-toggle-icon">&#9650;</span>
+    <span>Metadata</span>
+  </button>
+  <div id="metadataGrid"></div>
+</div>
 </div>
 
 <script type="module" src="app.js"></script>

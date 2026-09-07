@@ -31,6 +31,9 @@ const els = {
   hThumb: document.getElementById('hScrollThumb'),
   vTrack: document.getElementById('vScrollTrack'),
   vThumb: document.getElementById('vScrollThumb'),
+  metadataBar: document.getElementById('metadataBar'),
+  metadataGrid: document.getElementById('metadataGrid'),
+  metadataToggleBtn: document.getElementById('metadataToggleBtn'),
 };
 
 const viewer = new PointCloudViewer(els.scene, els.minimap, {
@@ -65,10 +68,6 @@ function hasNativeApi() {
   return Boolean(window.pywebview && window.pywebview.api);
 }
 
-function showControls(visible) {
-  els.controls.hidden = !visible;
-}
-
 function markActiveFile(path) {
   [...els.fileList.children].forEach((li) => {
     li.classList.toggle('active', li.dataset.path === path);
@@ -78,9 +77,79 @@ function markActiveFile(path) {
 function applyGrid(grid, displayName) {
   viewer.loadGrid(grid);
   currentFileName = displayName;
-  showControls(true);
   setStatus(`Loaded ${displayName}\n${grid.z_grid.length} x ${grid.z_grid[0].length} grid`);
 }
+
+// ---- metadata bar (the JSON alongside a scan inside an archive) ---------
+
+function formatMetadataLabel(key) {
+  // "gps.lat" / "capture_time" / "deviceId" -> "Gps Lat" / "Capture Time" / "Device Id"
+  const spaced = key
+    .replace(/\./g, ' ')
+    .replace(/_/g, ' ')
+    .replace(/([a-z0-9])([A-Z])/g, '$1 $2');
+  return spaced.replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function formatMetadataValue(value) {
+  if (value === null || value === undefined) return '—';
+  if (typeof value === 'object') return JSON.stringify(value);
+  return String(value);
+}
+
+// Flattens exactly one level of nesting (a "gps": {"lat":.., "lon":..}
+// object becomes "gps.lat" / "gps.lon" rows) -- deeper nesting or arrays
+// just get stringified as a single value rather than flattened further,
+// since we don't know the real shape of this data yet.
+function flattenMetadata(metadata) {
+  const rows = [];
+  for (const [key, value] of Object.entries(metadata)) {
+    if (value && typeof value === 'object' && !Array.isArray(value)) {
+      for (const [nestedKey, nestedValue] of Object.entries(value)) {
+        rows.push([`${key}.${nestedKey}`, nestedValue]);
+      }
+    } else {
+      rows.push([key, value]);
+    }
+  }
+  return rows;
+}
+
+function renderMetadata(metadata) {
+  els.metadataGrid.innerHTML = '';
+
+  if (!metadata || Object.keys(metadata).length === 0) {
+    els.metadataBar.hidden = true;
+    return;
+  }
+
+  const rows = flattenMetadata(metadata);
+  if (rows.length === 0) {
+    els.metadataBar.hidden = true;
+    return;
+  }
+
+  for (const [key, value] of rows) {
+    const item = document.createElement('div');
+    item.className = 'metadata-item';
+    const label = document.createElement('div');
+    label.className = 'metadata-label';
+    label.textContent = formatMetadataLabel(key);
+    const val = document.createElement('div');
+    val.className = 'metadata-value';
+    val.textContent = formatMetadataValue(value);
+    val.title = val.textContent; // full value on hover, in case it's truncated
+    item.appendChild(label);
+    item.appendChild(val);
+    els.metadataGrid.appendChild(item);
+  }
+
+  els.metadataBar.hidden = false;
+}
+
+els.metadataToggleBtn.addEventListener('click', () => {
+  els.metadataBar.classList.toggle('collapsed');
+});
 
 // ---- loading: native path (Browse File / Browse Folder) -----------------
 
@@ -93,7 +162,36 @@ async function loadFromPath(path, displayName) {
   try {
     const grid = await window.pywebview.api.load_path(path);
     applyGrid(grid, displayName);
+    renderMetadata(null); // a loose CSV has no accompanying JSON
     markActiveFile(path);
+  } catch (err) {
+    setStatus(`Couldn't load ${displayName}: ${err}`, true);
+  }
+}
+
+// ---- loading: archive (Browse File / Browse Folder, a .zip entry) -------
+
+async function loadFromArchive(path, displayName) {
+  if (!hasNativeApi()) {
+    setStatus('Browse is only available in the desktop app.', true);
+    return;
+  }
+  setStatus(`Extracting ${displayName}…`);
+  try {
+    const result = await window.pywebview.api.load_archive(path);
+    applyGrid(result.grid, displayName);
+    renderMetadata(result.metadata);
+    markActiveFile(path);
+    if (result.extracted_files) {
+      // No .json found -- show what actually got extracted instead of
+      // just silently having no metadata, so this is easy to report back.
+      setStatus(
+        `${els.status.textContent}\nNo .json found. Archive contains:\n${result.extracted_files.join('\n')}`
+      );
+    } else if (result.metadata_error) {
+      // Found the .json but couldn't parse it -- show the real reason.
+      setStatus(`${els.status.textContent}\nMetadata error: ${result.metadata_error}`, true);
+    }
   } catch (err) {
     setStatus(`Couldn't load ${displayName}: ${err}`, true);
   }
@@ -136,6 +234,7 @@ async function loadFromDroppedFile(file) {
       ? await window.pywebview.api.load_csv_text(text, file.name)
       : parseGridCsvClientSide(text);
     applyGrid(grid, file.name);
+    renderMetadata(null); // a loose CSV has no accompanying JSON
     els.fileListWrap.hidden = true;
   } catch (err) {
     setStatus(`Couldn't load ${file.name}: ${err}`, true);
@@ -175,7 +274,12 @@ els.browseFileBtn.addEventListener('click', async () => {
   const path = await window.pywebview.api.pick_file();
   if (path) {
     els.fileListWrap.hidden = true;
-    loadFromPath(path, path.split(/[\\/]/).pop());
+    const name = path.split(/[\\/]/).pop();
+    if (path.toLowerCase().endsWith('.zip')) {
+      loadFromArchive(path, name);
+    } else {
+      loadFromPath(path, name);
+    }
   }
 });
 
@@ -186,19 +290,32 @@ els.browseFolderBtn.addEventListener('click', async () => {
   }
   const entries = await window.pywebview.api.pick_folder();
   if (!entries || entries.length === 0) {
-    if (entries) setStatus('No .csv files found in that folder.', true);
+    if (entries) setStatus('No .csv or .zip files found in that folder.', true);
     return;
   }
   els.fileList.innerHTML = '';
   entries.forEach((entry) => {
     const li = document.createElement('li');
-    li.textContent = entry.name;
+    const badge = document.createElement('span');
+    badge.className = `file-kind-badge ${entry.kind}`;
+    badge.textContent = entry.kind === 'archive' ? 'ZIP' : 'CSV';
+    const name = document.createElement('span');
+    name.className = 'file-name';
+    name.textContent = entry.name;
+    li.appendChild(badge);
+    li.appendChild(name);
     li.dataset.path = entry.path;
-    li.addEventListener('click', () => loadFromPath(entry.path, entry.name));
+    li.addEventListener('click', () => {
+      if (entry.kind === 'archive') {
+        loadFromArchive(entry.path, entry.name);
+      } else {
+        loadFromPath(entry.path, entry.name);
+      }
+    });
     els.fileList.appendChild(li);
   });
   els.fileListWrap.hidden = false;
-  setStatus(`Found ${entries.length} CSV file${entries.length === 1 ? '' : 's'}. Pick one to view.`);
+  setStatus(`Found ${entries.length} file${entries.length === 1 ? '' : 's'}. Pick one to view.`);
 });
 
 // ---- colour mode + contours ---
