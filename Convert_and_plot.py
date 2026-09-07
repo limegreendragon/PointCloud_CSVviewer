@@ -27,6 +27,7 @@ import functools
 import http.server
 import io
 import os
+import shutil
 import sys
 import threading
 import traceback
@@ -36,6 +37,63 @@ import webview
 WINDOW_TITLE = "PointCloud Viewer"
 EXPORT_VIEW_ORDER = ["top", "side", "front"]
 DEBUG_LOG_PATH = os.path.expanduser("~/PointCloudViewer_debug_log.txt")
+
+# Plain inline HTML/CSS for the splash -- deliberately not part of webapp/
+# (no need to involve the local HTTP server just to show a loading
+# message), and deliberately not theme-aware (light/dark preference lives
+# in the real window's localStorage, which doesn't matter for a screen
+# that's only up for a second or two).
+_SPLASH_HTML = """
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  html, body {
+    margin: 0;
+    height: 100%;
+    background: #0f121a;
+    color: #e7ebf3;
+    font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  .box { text-align: center; }
+  h1 { font-size: 15px; font-weight: 600; margin: 16px 0 4px; }
+  p { font-size: 12px; color: #8b93a7; margin: 0; }
+  .spinner {
+    width: 26px;
+    height: 26px;
+    margin: 0 auto;
+    border: 3px solid #262c3d;
+    border-top-color: #4f8dff;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+  <div class="box">
+    <div class="spinner"></div>
+    <h1>PointCloud Viewer</h1>
+    <p>Starting up&hellip;</p>
+  </div>
+</body>
+</html>
+"""
+
+_STARTUP_ERROR_HTML = """
+<body style="font-family: -apple-system, sans-serif; padding: 32px; max-width: 560px;">
+  <h2>{title}</h2>
+  <p>{message}</p>
+  <p>A debug log was written to:<br><code>{log_path}</code></p>
+  <p>Please share that file so this can be fixed.</p>
+</body>
+"""
 
 
 class _QuietRequestHandler(http.server.SimpleHTTPRequestHandler):
@@ -201,11 +259,18 @@ class Api:
             shutil.rmtree(extracted_dir, ignore_errors=True)
         self._extracted_dirs.clear()
 
-def _write_startup_debug_log(webapp_dir):
-    """Writes what we know about where the app looked for its viewer
-    files, so a report from a broken build actually says something
-    useful instead of just "it showed a 404". Best-effort: if even this
-    fails, we still want to fall through to the on-screen error page."""
+
+def _write_debug_log(lines):
+    """Best-effort: if even this fails, we still want to fall through to
+    the on-screen error page rather than raise."""
+    try:
+        with open(DEBUG_LOG_PATH, "w") as f:
+            f.write("\n".join(lines) + "\n")
+    except OSError:
+        pass
+
+
+def _write_missing_webapp_debug_log(webapp_dir):
     lines = [
         "PointCloud Viewer startup diagnostic",
         f"frozen (running from a packaged build): {getattr(sys, 'frozen', False)}",
@@ -217,45 +282,15 @@ def _write_startup_debug_log(webapp_dir):
     if meipass and os.path.isdir(meipass):
         lines.append(f"contents of {meipass}:")
         lines.extend(f"  - {name}" for name in sorted(os.listdir(meipass)))
-    try:
-        with open(DEBUG_LOG_PATH, "w") as f:
-            f.write("\n".join(lines) + "\n")
-    except OSError:
-        pass  # nothing more we can do if we can't even write the log
+    _write_debug_log(lines)
 
 
-def _show_missing_webapp_error():
-    """Shown instead of a blank/broken window when the viewer's own
-    HTML/JS files (webapp/index.html etc.) can't be found -- this is a
-    packaging bug, not something a user did wrong, so this points at the
-    debug log rather than pretending there's a fix to try."""
-    webview.create_window(
-        WINDOW_TITLE,
-        html=f"""
-        <body style="font-family: -apple-system, sans-serif; padding: 32px; max-width: 560px;">
-          <h2>PointCloud Viewer couldn't start</h2>
-          <p>The app's viewer files (the <code>webapp</code> folder) weren't
-          found where this build expected them -- that's a packaging bug,
-          not something wrong with your CSV or computer.</p>
-          <p>A debug log was written to:<br><code>{DEBUG_LOG_PATH}</code></p>
-          <p>Please share that file so this can be fixed.</p>
-        </body>
-        """,
-        width=640,
-        height=420,
-    )
-    webview.start()
-
-
-def main():
-    webapp_dir = resource_path("webapp")
-    if not os.path.isfile(os.path.join(webapp_dir, "index.html")):
-        _write_startup_debug_log(webapp_dir)
-        _show_missing_webapp_error()
-        return
-
-    port = _start_local_server(webapp_dir)
-    api = Api()
+def _show_startup_error(title, message):
+    """Shown in place of the real window when startup fails -- either
+    webapp/ wasn't found (a packaging bug) or something else went wrong
+    during the deferred setup work. Assumes webview's event loop is
+    already running (called from within main()'s func= callback), so
+    unlike the real window this does NOT call webview.start() itself."""
     webview.create_window(
         WINDOW_TITLE,
         html=_STARTUP_ERROR_HTML.format(title=title, message=message, log_path=DEBUG_LOG_PATH),
