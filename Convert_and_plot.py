@@ -31,12 +31,14 @@ import shutil
 import sys
 import threading
 import traceback
+import time
 
 import webview
 
 WINDOW_TITLE = "PointCloud Viewer"
 EXPORT_VIEW_ORDER = ["top", "side", "front"]
 DEBUG_LOG_PATH = os.path.expanduser("~/PointCloudViewer_debug_log.txt")
+MIN_SPLASH_SECONDS = 3
 
 # Plain inline HTML/CSS for the splash -- deliberately not part of webapp/
 # (no need to involve the local HTTP server just to show a loading
@@ -312,6 +314,18 @@ def main():
         resizable=False,
         background_color="#0f121a",  # matches the splash's own dark background, no white flash before it paints
     )
+      splash_shown_at = time.monotonic()
+
+    def _close_splash():
+        # Enforces MIN_SPLASH_SECONDS -- see its comment above. Runs on
+        # whatever thread the caller is on (a pywebview event thread when
+        # called from main_window.events.loaded), so the wait is done with
+        # a background timer rather than a blocking sleep there.
+        remaining = MIN_SPLASH_SECONDS - (time.monotonic() - splash_shown_at)
+        if remaining > 0:
+            threading.Timer(remaining, splash.destroy).start()
+        else:
+            splash.destroy()
 
     api = Api()
 
