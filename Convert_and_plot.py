@@ -30,14 +30,18 @@ import os
 import shutil
 import sys
 import threading
-import traceback
 import time
+import traceback
 
 import webview
 
 WINDOW_TITLE = "PointCloud Viewer"
 EXPORT_VIEW_ORDER = ["top", "side", "front"]
 DEBUG_LOG_PATH = os.path.expanduser("~/PointCloudViewer_debug_log.txt")
+# Running from source (no PyInstaller self-extraction, everything already
+# on disk/cached) can finish startup fast enough that the splash flashes
+# by before it's even registered. This guarantees it stays up at least
+# this long regardless of how fast the real window is ready.
 MIN_SPLASH_SECONDS = 3
 
 # Plain inline HTML/CSS for the splash -- deliberately not part of webapp/
@@ -73,7 +77,7 @@ _SPLASH_HTML = """
     border: 3px solid #262c3d;
     border-top-color: #4f8dff;
     border-radius: 50%;
-    animation: spin 3s linear infinite;
+    animation: spin 0.8s linear infinite;
   }
   @keyframes spin { to { transform: rotate(360deg); } }
 </style>
@@ -339,7 +343,7 @@ def main():
             webapp_dir = resource_path("webapp")
             if not os.path.isfile(os.path.join(webapp_dir, "index.html")):
                 _write_missing_webapp_debug_log(webapp_dir)
-                splash.destroy()
+                _close_splash()
                 _show_startup_error(
                     "PointCloud Viewer couldn't start",
                     "The app's viewer files (the <code>webapp</code> folder) weren't "
@@ -362,12 +366,12 @@ def main():
             # it doesn't mean anything has been painted yet, so destroying
             # the splash immediately left a visible gap with no window
             # showing anything (looked like the app quit and relaunched).
-            main_window.events.loaded += splash.destroy
+            main_window.events.loaded += _close_splash
         except Exception:
             _write_debug_log(
                 ["PointCloud Viewer startup crash", "", traceback.format_exc()]
             )
-            splash.destroy()
+            _close_splash()
             _show_startup_error(
                 "PointCloud Viewer hit a problem starting up",
                 "Something unexpected went wrong during startup.",
