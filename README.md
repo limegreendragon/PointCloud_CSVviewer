@@ -20,6 +20,14 @@ point cloud.
 
 ## Installation
 
+## Windows app
+Go to the Release tag on the right hand side of this page - go to the latest release and download it. When you double click it, it will likely complain and say this is from an untrusted source - if you click show me more, there will be a run anyway option. Click that and give it a few seconds and it will open!
+
+## Mac app
+Again - go to the Releases tag on the right hand side. If you are an intel core Mac - download the intel version if you have an M1/2 chip Mac download the other version. Again it will say not from a trusted source. Try and open it - DONT CLICK MOVE TO BIN! - Navigate to your Macs Settings and Privacy and Security and then scroll to the bottom and say trust this app.
+Double click on the package and voilá!
+
+## CLI
 Python 3.9+ recommended.
 
 ```bash
@@ -33,7 +41,6 @@ pip install -r Requirements.txt
 ```bash
 python Convert_and_plot.py
 ```
-
 A small loading screen appears immediately, then the **PointCloud Viewer**
 window opens — there's no file to pass on the command line, everything's
 done from inside the app:
