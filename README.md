@@ -34,11 +34,6 @@ Python 3.9+ recommended.
 git clone https://github.com/limegreendragon/PointCloud_CSVviewer.git
 cd PointCloud_CSVviewer
 pip install -r Requirements.txt
-```
-
-## To run
-
-```bash
 python Convert_and_plot.py
 ```
 A small loading screen appears immediately, then the **PointCloud Viewer**
